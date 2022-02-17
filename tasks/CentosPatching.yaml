@@ -1,0 +1,55 @@
+---
+- name: Delete pre-existing repos
+  shell: rm -rf /etc/yum.repos.d/Centos* && rm -rf /etc/yum.repos.d/epel*
+  changed_when: true
+  ignore_errors: true
+
+- name: We will register the repos
+  shell:
+    cmd: "{{ item }}"
+  with_items:
+    - yum clean all
+    - subscription-manager clean
+    - subscription-manager remove --all
+    - subscription-manager unregister
+    - subscription-manager register
+  changed_when: true
+  ignore_errors: true
+
+#### this task will upgrade/install the rpm's ####
+- name: Upgrade all packages on the server
+  yum:
+    name: '*'
+    exclude: elasticsearch*,java*,cassandra*,Percona*,openjdk*,nginx*,salt*,datadog*,jdk*,filebeat*,logstash*,*MySQL*,iptables*,docker*,kube*,kafka*,mariadb*,mongo*
+    update_cache: yes
+  register: yum_update
+
+- name: Updated package list
+  debug:
+    msg: "{{ yum_update }}"
+
+###### Script to Print Kernel present in Machine in order #################
+- name: Script to Print various kernel in grub order.
+  shell: awk -F\' '$1=="menuentry " {print $2}' /etc/grub2.cfg
+  changed_when: true
+  register: ScriptGenerated
+
+- name: Output of list of kernels
+  debug:
+    msg: "{{ ScriptGenerated.stdout_lines }}"
+
+###### Script to Set kernel to latest Patched Kernel ########################
+- name: Set default value to latest Patch.
+  shell: grub2-set-default 0
+  register: grub_value_set
+  when: ScriptGenerated is succeeded
+
+###### Generate Grub Configuration file###################
+- name: Generate Grub Configuration file.
+  shell: grub2-mkconfig -o /boot/grub2/grub.cfg
+  register: Grub_value_set
+  when: grub_value_set is succeeded
+
+- name: Output of grub configuration file
+  debug:
+    msg: "{{ Grub_value_set.stderr_lines }}"

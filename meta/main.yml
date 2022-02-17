@@ -1,0 +1,25 @@
+---
+galaxy_info:
+  author: Kritarth Pant
+  description: To Patch the mongo Cluster for kernel update
+  company: Opstree Solutions
+  license: GPLv3
+  min_ansible_version: 2.12
+  role_name: mongo_patching
+  namespace: opstree_devops
+
+  platforms:
+    - name: redhat:7
+
+
+  galaxy_tags:
+    - opstree
+    - otosm
+    - mongo
+    - nonrelational
+    - patchmanagement
+    - devsecops
+    - devops
+    - security
+
+dependencies: []
