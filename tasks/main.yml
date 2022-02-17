@@ -1,0 +1,68 @@
+---
+# tasks file for mongo_role
+### thiis task is to check if kernel update happend and system needs reboot or not ###
+- name: Check if reboot required after kernel update.
+  shell: KERNEL_NEW=$(rpm -q --last kernel |head -1 | awk '{print $1}' | sed 's/kernel-//'); KERNEL_NOW=$(uname -r); if [[ $KERNEL_NEW != $KERNEL_NOW ]]; then echo "reboot_needed"; else echo "reboot_not_needed"; fi
+  changed_when: true
+  ignore_errors: true
+  register: reboot_required
+
+- name: Patching server
+  include_tasks: CentosPatching.yaml
+  when: ansible_distribution == 'CentOS'
+
+- name: Enter the mongo shell
+  community.mongodb.mongodb_shell:
+    login_user: "{{ login_user }}"
+    login_password: "{{ login_password }}"
+    eval: 'db.adminCommand( { hello : 1 } )'
+    stringify: yes
+  register: replica_set_status
+
+- name: Including Pre-Checks for primary
+  include_tasks: pre-primary-mongodb.yml
+  when: replica_set_status['transformed_output']['secondary']  == false
+
+- name: Including Pre-Checks for secondary
+  include_tasks: pre-secondary-mongodb.yml
+  when: replica_set_status['transformed_output']['secondary']  == true
+
+- name: Do you want Reboot only 60 Seconds to confirm.
+  debug:
+    msg: Do you want  to REBOOT.
+  when: reboot_required.stdout == "reboot_needed"
+
+- name: There is no need to reboot
+  debug:
+    msg: No need to REBOOT.
+  when: reboot_required.stdout == "reboot_not_needed"
+
+### this task is to wait for 3 minutues for system to come up after the reboot ###
+
+- name: Pause for 60 secs
+  pause:
+    minutes: 1
+    prompt: If you like to stop the process press Ctrl+C within 60 secs
+  when: reboot_required.stdout == "reboot_needed"
+
+  ### this task is to restart the system ###
+
+- name: Reboot the machine
+  shell: "sleep 5 && reboot"
+  async: 10
+  poll: 0
+  when: reboot_required.stdout == "reboot_needed"
+  ignore_errors: true
+
+### this task is for wating to machine to be online ###
+
+- name: Wait for the machine to come back online
+  wait_for_connection:
+    connect_timeout: 60
+    sleep: 5
+    delay: 5
+    timeout: 300
+  when: reboot_required.stdout == "reboot_needed"
+
+- name: Performing post server reboot checks
+  include_tasks: post-mongodb.yml

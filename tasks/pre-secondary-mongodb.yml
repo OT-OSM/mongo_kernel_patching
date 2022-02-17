@@ -1,0 +1,26 @@
+---
+- name: Checking the cluster health
+  community.mongodb.mongodb_shell:
+    login_user: "{{ login_user }}"
+    login_password: "{{ login_password }}"
+    eval: 'db.adminCommand( { replSetGetStatus: 1, initialSync: 1 } )'
+    stringify: yes
+  register: replica_set_status
+
+- name: Get replication set status
+  debug:
+    msg: "{{ replica_set_status }}"
+
+- name: Stopping mongo service for reboot
+  community.mongodb.mongodb_shell:
+    login_user: "{{ login_user }}"
+    login_password: "{{ login_password }}"
+    eval: 'db.adminCommand({ "shutdown" : 1, timeoutSecs: 60 })'
+    stringify: yes
+  register: mongo_service_stop
+  when: replica_set_status is succeeded
+  ignore_errors: true
+
+- name: Get mongo service status
+  debug:
+    msg: "{{ mongo_service_stop }}"
